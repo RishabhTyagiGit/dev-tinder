@@ -2,7 +2,11 @@ const express = require('express');
 
 const app = express();
 
-app.use('/',(req,res)=>{
+app.get('/',(req,res)=>{
+    res.send('Hello Word')
+})
+
+app.post('/',(req,res)=>{
     res.send('Hello Word')
 })
 
