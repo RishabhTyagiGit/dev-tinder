@@ -7,6 +7,7 @@ const { validateSignUpData } = require("./utils/validation")
 
 const app = express();
 const User = require("./models/user");
+const { userAuth } = require('./middlewares/auth');
 
 app.use(express.json())
 app.use(cookieParser());
@@ -42,7 +43,9 @@ app.post('/login', async (req, res) => {
             throw new Error("Invalid Credentials");
         } else {
             const token = await jwt.sign({ _id: user._id }, "DevTinder");
-            res.cookie('token', token);
+            res.cookie('token', token, {
+                expires: new Date(Date.now() + 8 * 3600000),
+            });
             res.send("login Successfully!")
         }
     } catch (err) {
@@ -50,20 +53,9 @@ app.post('/login', async (req, res) => {
     }
 })
 
-app.get('/profile', async (req, res) => {
+app.get('/profile', userAuth, async (req, res) => {
     try {
-        const cookies = req.cookies;
-        const { token } = cookies;
-        if (!token) {
-            throw new Error("Invalid Toekn");
-        }
-        const decodedMessage = await jwt.verify(token, 'DevTinder');
-        console.log(decodedMessage)
-        const { _id } = decodedMessage;
-        const user = await User.findById(_id);
-        if (!user) {
-            throw new Error("User does not exist");
-        }
+        const user = req.user;
         res.send(user);
     } catch (err) {
         res.status(400).send("ERROR : " + err.message);
