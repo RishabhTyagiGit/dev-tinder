@@ -1,19 +1,72 @@
 const express = require('express');
-const validator = require('validator');
+const bcrypt = require('bcrypt');
+const cookieParser = require("cookie-parser");
+const jwt = require('jsonwebtoken');
 const connectDB = require('./config/database')
+const { validateSignUpData } = require("./utils/validation")
 
 const app = express();
 const User = require("./models/user");
 
 app.use(express.json())
+app.use(cookieParser());
 
 app.post('/signup', async (req, res) => {
-    const user = new User(req.body)
     try {
+        validateSignUpData(req);
+        const { firstName, lastName, emailId, password } = req.body;
+        const passwordHash = await bcrypt.hash(password, 10);
+        const user = new User({
+            firstName,
+            lastName,
+            emailId,
+            password: passwordHash,
+        })
         await user.save();
         res.send('user added successfully!!')
     } catch (err) {
+        console.log(err)
         res.status(500).send("Error saving the user:", err.message)
+    }
+})
+
+app.post('/login', async (req, res) => {
+    try {
+        const { emailId, password } = req.body;
+        const user = await User.findOne({ emailId: emailId });
+        if (!user) {
+            throw new Error("Invalid Credentials");
+        }
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            throw new Error("Invalid Credentials");
+        } else {
+            const token = await jwt.sign({ _id: user._id }, "DevTinder");
+            res.cookie('token', token);
+            res.send("login Successfully!")
+        }
+    } catch (err) {
+        res.status(400).send("Error: " + err.message)
+    }
+})
+
+app.get('/profile', async (req, res) => {
+    try {
+        const cookies = req.cookies;
+        const { token } = cookies;
+        if (!token) {
+            throw new Error("Invalid Toekn");
+        }
+        const decodedMessage = await jwt.verify(token, 'DevTinder');
+        console.log(decodedMessage)
+        const { _id } = decodedMessage;
+        const user = await User.findById(_id);
+        if (!user) {
+            throw new Error("User does not exist");
+        }
+        res.send(user);
+    } catch (err) {
+        res.status(400).send("ERROR : " + err.message);
     }
 })
 
@@ -79,7 +132,7 @@ app.patch('/user', async (req, res) => {
         });
         res.send('User Updated Successfully!')
     } catch (err) {
-        res.status(400).send('Update Failed: '+ err.message)
+        res.status(400).send('Update Failed: ' + err.message)
     }
 })
 
